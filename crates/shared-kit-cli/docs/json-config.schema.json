@@ -1,0 +1,91 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Template Configuration",
+  "type": "object",
+  "properties": {
+    "templates": {
+      "type": "object",
+      "patternProperties": {
+        "^[a-zA-Z0-9-_]+$": {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": [
+                "project",
+                "package",
+                "monorepo"
+              ]
+            },
+            "template": {
+              "type": "string",
+              "description": "Local template path (relative or absolute)"
+            },
+            "repo": {
+              "type": "string",
+              "format": "uri",
+              "description": "Remote repository URL (GitHub or GitLab)"
+            },
+            "includes": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "excludes": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "template_vars": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "placeholder": {
+                    "type": "string"
+                  },
+                  "prompt": {
+                    "type": "string"
+                  },
+                  "default": {
+                    "type": "string"
+                  },
+                  "completed_script": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    },
+                    "description": "Commands executed after template generation"
+                  },
+                  "includes_paths": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "excludes_paths": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  }
+                },
+                "required": [
+                  "placeholder"
+                ]
+              }
+            }
+          },
+          "required": [
+            "kind"
+          ]
+        }
+      }
+    }
+  },
+  "required": [
+    "templates"
+  ]
+}
