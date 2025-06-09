@@ -13,7 +13,7 @@ use crate::{
     helper::path::expand_dir,
 };
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
 pub struct ConfigMetadata {
     pub templates: Templates,
 }

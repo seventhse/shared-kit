@@ -2,11 +2,16 @@ use anyhow::{Context, Ok};
 use clap::Args;
 use std::env;
 use std::path::PathBuf;
+use std::sync::Arc;
 
-use crate::components::new_command::{ensure_target_directory, ensure_template_selected};
+use crate::components::new_command::{
+    ensure_replace_var_input, ensure_target_directory, ensure_template_selected,
+};
 use crate::components::progress::copy_directory_with_progress;
 use crate::config::Config;
 use crate::constant::TemplateKind;
+use crate::helper::matcher::PatternSpec;
+use crate::helper::matcher_group::MatcherGroup;
 use crate::helper::path::expand_dir;
 use crate::helper::repo::resolve_repo_to_dir;
 
@@ -42,28 +47,48 @@ pub fn new_command_action(config: &mut Config, args: &NewCommand) -> anyhow::Res
 
     info_msg!("📁 Project will be created in: '{}'", target.display());
 
-    if try_apply_direct_template(&target, args.template.clone())? {
+    if try_apply_direct_template(&target, args.template.clone(), None)? {
         return Ok(());
     }
 
-    if try_apply_direct_repo(&target, args.repo.clone())? {
+    if try_apply_direct_repo(&target, args.repo.clone(), None)? {
         return Ok(());
     }
 
     let new_template = ensure_template_selected(&config, args)?;
 
-    if try_apply_direct_template(&target, new_template.template.clone())? {
+    let resolved_vars = ensure_replace_var_input(&new_template)
+        .with_context(|| format!("Failed to input replace var"))?;
+
+    let matcher_group = MatcherGroup::from_resolved(
+        PatternSpec::from_option_vec(new_template.includes.clone()),
+        PatternSpec::from_option_vec(new_template.excludes.clone()),
+        resolved_vars,
+    )
+    .with_context(|| format!("Failed to create matcher group"))?;
+
+    let matcher_group = Arc::new(matcher_group);
+
+    if try_apply_direct_template(
+        &target,
+        new_template.template.clone(),
+        Some(matcher_group.clone()),
+    )? {
         return Ok(());
     }
 
-    if try_apply_direct_repo(&target, new_template.repo.clone())? {
+    if try_apply_direct_repo(&target, new_template.repo.clone(), Some(matcher_group.clone()))? {
         return Ok(());
     }
 
     Ok(())
 }
 
-fn try_apply_direct_template(target: &PathBuf, template: Option<String>) -> anyhow::Result<bool> {
+fn try_apply_direct_template(
+    target: &PathBuf,
+    template: Option<String>,
+    matcher_group: Option<Arc<MatcherGroup>>,
+) -> anyhow::Result<bool> {
     if template.is_none() {
         return Ok(false);
     }
@@ -78,12 +103,16 @@ fn try_apply_direct_template(target: &PathBuf, template: Option<String>) -> anyh
         );
     }
 
-    copy_directory_with_progress(&path, &target)?;
+    copy_directory_with_progress(&path, &target, matcher_group)?;
 
     Ok(true)
 }
 
-fn try_apply_direct_repo(target: &PathBuf, repo: Option<String>) -> anyhow::Result<bool> {
+fn try_apply_direct_repo(
+    target: &PathBuf,
+    repo: Option<String>,
+    matcher_group: Option<Arc<MatcherGroup>>,
+) -> anyhow::Result<bool> {
     if repo.is_none() {
         return Ok(false);
     }
@@ -92,7 +121,7 @@ fn try_apply_direct_repo(target: &PathBuf, repo: Option<String>) -> anyhow::Resu
 
     let repo = resolve_repo_to_dir(&repo_url)?;
 
-    copy_directory_with_progress(&repo.root_dir, target)?;
+    copy_directory_with_progress(&repo.root_dir, target, matcher_group)?;
 
     Ok(true)
 }

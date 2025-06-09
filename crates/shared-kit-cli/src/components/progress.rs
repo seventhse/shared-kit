@@ -5,7 +5,11 @@ use std::{
     sync::Arc,
 };
 
-use crate::helper::file_system::{FileTransformKind, copy_directory_with_replace};
+use crate::helper::matcher_group::MatcherGroup;
+use crate::helper::{
+    file_system::copy_directory_with_replace,
+    file_transform_pipe::{filter_file_middleware, replace_file_middleware},
+};
 use anyhow::Context;
 use indicatif::{ProgressBar, ProgressStyle};
 use reqwest::blocking::Response;
@@ -67,13 +71,23 @@ pub fn download_file_with_progress(resp: Response, dest_path: &Path) -> anyhow::
     Ok(())
 }
 
-pub fn copy_directory_with_progress(origin: &PathBuf, target: &PathBuf) -> anyhow::Result<()> {
+pub fn copy_directory_with_progress(
+    origin: &PathBuf,
+    target: &PathBuf,
+    matcher_group: Option<Arc<MatcherGroup>>,
+) -> anyhow::Result<()> {
     let pb = create_file_progress(origin)?;
     let pb = Arc::new(pb);
 
     let handle = FileTransformPipe::new()
+        .add_option(
+            matcher_group.clone().map(|mg| replace_file_middleware(mg.clone(), origin.clone())),
+        )
+        .add_option(
+            matcher_group.clone().map(|mg| filter_file_middleware(mg.clone(), origin.clone())),
+        )
         .add(copy_file_progress_middleware(pb.clone(), origin.clone()))
-        .into_handler(|_| FileTransformKind::NoChange);
+        .finalize();
 
     copy_directory_with_replace(origin, target, Some(&handle))?;
 

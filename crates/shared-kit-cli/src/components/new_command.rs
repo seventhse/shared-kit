@@ -7,6 +7,8 @@ use std::path::PathBuf;
 
 use crate::config::Config;
 use crate::constant::TemplateItem;
+use crate::helper::matcher::PatternSpec;
+use crate::helper::matcher_group::ResolvedVar;
 use crate::subcommand::new_command::NewCommand;
 
 #[derive(Debug, Clone)]
@@ -109,4 +111,37 @@ pub fn ensure_template_selected(
         .with_context(|| format!("Template '{}' not found in config metadata", selected))?;
 
     Ok(template.clone())
+}
+
+pub fn ensure_replace_var_input(template: &TemplateItem) -> anyhow::Result<Vec<ResolvedVar>> {
+    let mut resolved_vars: Vec<ResolvedVar> = vec![];
+
+    if let Some(vars) = &template.template_vars {
+        for var in vars {
+            let placeholder = var.placeholder.clone();
+            let message = var
+                .prompt
+                .clone()
+                .unwrap_or_else(|| format!("Enter new value for {}", placeholder));
+
+            let default = var.default.clone();
+
+            let input = if let Some(default_val) = default {
+                Text::new(&message).with_initial_value(&default_val).prompt().unwrap_or(default_val)
+            } else {
+                Text::new(&message).prompt().unwrap_or_else(|_| "".to_string())
+            };
+
+            let resolve_var = ResolvedVar {
+                placeholder: placeholder,
+                replacement: input,
+                includes: PatternSpec::from_option_vec(var.includes_paths.clone()),
+                excludes: PatternSpec::from_option_vec(var.excludes_paths.clone()),
+            };
+
+            resolved_vars.push(resolve_var);
+        }
+    }
+
+    Ok(resolved_vars)
 }

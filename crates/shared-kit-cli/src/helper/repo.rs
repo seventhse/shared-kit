@@ -70,6 +70,40 @@ impl RepoInfo {
     }
 }
 
+/// Parses a Git repository input string (supports full URLs and shorthand notation).
+///
+/// # Supported formats
+///
+/// ## ✅ Full URL formats (platform auto-detection)
+/// - `https://github.com/user/repo` (default branch)
+/// - `https://github.com/user/repo#branch` (specific branch)
+/// - `https://github.com/user/repo@v1.0.0` (specific tag)
+/// - `https://github.com/user/repo@<40-char-commit>` (specific commit)
+/// - `https://gitlab.com/group/repo`
+/// - `https://gitea.com/user/repo#branch`
+///
+/// ## ✅ Shorthand formats (default platform is GitHub)
+/// - `user/repo` (default branch)
+/// - `user/repo#branch`
+/// - `user/repo@v1.2.3`
+/// - `user/repo@0123456789abcdef0123456789abcdef01234567`
+///
+/// # Parameters
+/// - `input`: The repository address string, either a full URL or GitHub-style shorthand.
+///
+/// # Returns
+/// - `RepoInfo` containing platform, user, repo name, and ref (branch/tag/commit).
+///
+/// # Errors
+/// - Returns an error if the input format is invalid.
+///
+/// # Example
+/// ```
+/// let info = parse_repo_input(&"user/repo#dev".to_string()).unwrap();
+/// assert_eq!(info.repo, "repo");
+/// assert_eq!(info.r#ref, GitRef::Branch("dev".to_string()));
+/// ```
+///
 pub fn parse_repo_input(input: &String) -> anyhow::Result<RepoInfo> {
     // Try to parse URL form
     if input.starts_with("http://") || input.starts_with("https://") {

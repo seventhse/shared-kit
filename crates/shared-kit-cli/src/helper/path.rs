@@ -1,16 +1,25 @@
 use dirs::home_dir;
 use path_clean::PathClean;
-use std::path::{Path, PathBuf};
+use std::{
+    env::{current_dir, current_exe},
+    path::{Path, PathBuf},
+};
 
 pub fn expand_dir(path: &str) -> Option<PathBuf> {
     if let Some(stripped) = path.strip_prefix("~/") {
         home_dir().map(|home| home.join(stripped))
+    } else if let Some(stripped) = path.strip_prefix("./") {
+        current_exe().ok().and_then(|exe| exe.parent().map(|dir| dir.join(stripped)))
+    } else if let Some(stripped) = path.strip_prefix("../") {
+        current_dir().ok().map(|dir| dir.join("..").join(stripped))
+    } else if path.eq("~") {
+        dirs::home_dir()
     } else {
         Some(PathBuf::from(path))
     }
 }
 
-pub fn join_with_config_dir(config_path: Option<&PathBuf>, relative: &Path) -> PathBuf {
+pub fn join_with_config_dir(config_path: Option<&Path>, relative: &Path) -> PathBuf {
     let path = match config_path {
         Some(base_path) => {
             let dir = base_path.parent().unwrap_or_else(|| Path::new("."));

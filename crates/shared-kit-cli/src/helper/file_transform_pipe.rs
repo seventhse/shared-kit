@@ -6,6 +6,8 @@ use std::{
 use indicatif::ProgressBar;
 
 use crate::helper::file_system::FileTransformKind;
+use crate::helper::matcher::MatchResult;
+use crate::helper::matcher_group::MatcherGroup;
 
 pub type TransformContext = (String, PathBuf);
 pub type TransformNext = Arc<dyn Fn(TransformContext) -> FileTransformKind + Send + Sync>;
@@ -44,6 +46,20 @@ impl FileTransformPipe {
         self
     }
 
+    pub fn add_if(mut self, condition: bool, middleware: Middleware) -> Self {
+        if condition {
+            self.middlewares.push(middleware);
+        }
+        self
+    }
+
+    pub fn add_option(mut self, middleware: Option<Middleware>) -> Self {
+        if let Some(mw) = middleware {
+            self.middlewares.push(mw);
+        }
+        self
+    }
+
     pub fn into_handler(
         self,
         final_handler: impl Fn(TransformContext) -> FileTransformKind + Send + Sync + 'static,
@@ -58,6 +74,10 @@ impl FileTransformPipe {
 
         move |content: &str, path: &Path| next((content.to_string(), path.to_path_buf()))
     }
+
+    pub fn finalize(self) -> impl Fn(&str, &Path) -> FileTransformKind + Send + Sync + 'static {
+        self.into_handler(|_| FileTransformKind::NoChange)
+    }
 }
 
 pub fn copy_file_progress_middleware(pb: Arc<ProgressBar>, origin: PathBuf) -> Middleware {
@@ -66,5 +86,33 @@ pub fn copy_file_progress_middleware(pb: Arc<ProgressBar>, origin: PathBuf) -> M
         pb.set_message(format!("{}", relative_path.display()));
         pb.inc(1);
         next((_content, path))
+    })
+}
+
+pub fn filter_file_middleware(matcher_group: Arc<MatcherGroup>, origin: PathBuf) -> Middleware {
+    make_middleware(move |(_content, path), next| {
+        let path_clone = path.clone();
+        let full_path = if path.clone().is_absolute() {
+            path_clone.to_path_buf()
+        } else {
+            origin.join(path_clone)
+        };
+
+        if matcher_group.global.matches(&full_path) != MatchResult::Matched {
+            return FileTransformKind::Skip;
+        }
+
+        next((_content, path))
+    })
+}
+
+pub fn replace_file_middleware(matcher_group: Arc<MatcherGroup>, origin: PathBuf) -> Middleware {
+    make_middleware(move |(content, path), next| {
+        let path_clone = path.clone();
+
+        // let full_path =
+        //     if path.clone().is_absolute() { path.to_path_buf() } else { origin.join(path) };
+
+        next((content, path_clone))
     })
 }
