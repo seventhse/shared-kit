@@ -5,18 +5,18 @@ use std::{
     sync::Arc,
 };
 
-use crate::helper::matcher_group::MatcherGroup;
-use crate::helper::{
-    file_system::copy_directory_with_replace,
-    file_transform_pipe::{filter_file_middleware, replace_file_middleware},
-};
 use anyhow::Context;
 use indicatif::{ProgressBar, ProgressStyle};
 use reqwest::blocking::Response;
+use shared_kit_common::{
+    file_utils::copy::{FileTransformKind, copy_directory_with_transform},
+    matcher::{Matcher},
+    middleware_pipeline::MiddlewarePipeline,
+};
+use shared_kit_common::{file_utils::count::pre_count_files, log_info};
 
-use crate::helper::{
-    file_system::pre_count_files,
-    file_transform_pipe::{FileTransformPipe, copy_file_progress_middleware},
+use crate::helper::file_transform_middleware::{
+    FileMatcherItem, FileProgressMiddleware, FileTransformMiddleware,
 };
 
 pub fn create_file_progress(path: &PathBuf) -> anyhow::Result<ProgressBar> {
@@ -74,26 +74,24 @@ pub fn download_file_with_progress(resp: Response, dest_path: &Path) -> anyhow::
 pub fn copy_directory_with_progress(
     origin: &PathBuf,
     target: &PathBuf,
-    matcher_group: Option<Arc<MatcherGroup>>,
+    matcher: Option<Arc<Matcher<FileMatcherItem>>>,
 ) -> anyhow::Result<()> {
     let pb = create_file_progress(origin)?;
     let pb = Arc::new(pb);
 
-    let handle = FileTransformPipe::new()
-        .add_option(
-            matcher_group.clone().map(|mg| replace_file_middleware(mg.clone(), origin.clone())),
-        )
-        .add_option(
-            matcher_group.clone().map(|mg| filter_file_middleware(mg.clone(), origin.clone())),
-        )
-        .add(copy_file_progress_middleware(pb.clone(), origin.clone()))
-        .finalize();
+    let file_progress_middleware = FileProgressMiddleware::new(origin.clone(), pb.clone());
 
-    copy_directory_with_replace(origin, target, Some(&handle))?;
+    let handle = MiddlewarePipeline::new()
+        .add_option(matcher.map(|matcher| FileTransformMiddleware::new(origin.clone(), matcher)))
+        .add(file_progress_middleware)
+        .finalize(|_ctx| FileTransformKind::NoChange);
+
+    copy_directory_with_transform(origin, target, Some(&handle))
+        .with_context(|| format!("Failed to copying..."))?;
 
     let total_files = pb.length().unwrap_or(0);
 
-    info_msg!(
+    log_info!(
         "✅ Template copied from '{}' to '{}' ({} files)",
         origin.display(),
         target.display(),

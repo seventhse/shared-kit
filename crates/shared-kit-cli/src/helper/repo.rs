@@ -3,6 +3,7 @@ use std::path::{Path, PathBuf};
 
 use anyhow::Context;
 use reqwest::blocking::Client;
+use shared_kit_common::log_warn;
 use tempfile::TempDir;
 
 use crate::components::progress::download_file_with_progress;
@@ -63,7 +64,7 @@ impl RepoInfo {
             }
             RepoPlatform::Other(ref domain) => {
                 // 其他平台不支持直接下载zip，可以自定义处理或返回空串
-                warn_msg!("Warning: unsupported platform {}, fallback to empty url", domain);
+                log_warn!("Warning: unsupported platform {}, fallback to empty url", domain);
                 String::new()
             }
         }
@@ -160,7 +161,9 @@ pub fn parse_from_url(input: &String) -> anyhow::Result<RepoInfo> {
 }
 
 pub fn parse_from_short(input: &String) -> anyhow::Result<RepoInfo> {
-    let re = regex::Regex::new(r"^(?P<user>[^/\s]+)/(?P<repo>[^\s@#]+)([@#](?P<ref>[^\s]+))?$")?;
+    let re = shared_kit_common::regex::Regex::new(
+        r"^(?P<user>[^/\s]+)/(?P<repo>[^\s@#]+)([@#](?P<ref>[^\s]+))?$",
+    )?;
     let caps =
         re.captures(input).with_context(|| format!("Invalid short repo format: '{}'", input))?;
 

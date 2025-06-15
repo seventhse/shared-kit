@@ -5,13 +5,11 @@ use std::{
 };
 
 use anyhow::{Context, Ok, Result};
-use console::style;
 use serde::{Deserialize, Serialize};
+use shared_kit_common::log_warn;
+use shared_kit_common::{console::style, file_utils::path::expand_dir};
 
-use crate::{
-    constant::{DEFAULT_CONFIG_DIR, DEFAULT_CONFIG_FILENAME, TemplateKind, Templates},
-    helper::path::expand_dir,
-};
+use crate::constant::{DEFAULT_CONFIG_DIR, DEFAULT_CONFIG_FILENAME, TemplateKind, Templates};
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
 pub struct ConfigMetadata {
@@ -64,13 +62,13 @@ impl Config {
         let config_path = match config_path {
             Some(p) => p,
             None => {
-                info_msg!("No config path provided; using default configuration.");
+                log_warn!("No config path provided; using default configuration.");
                 return Ok((config_path, ConfigMetadata::default()));
             }
         };
 
         if !config_path.exists() {
-            warn_msg!(
+            log_warn!(
                 "Config file not found at: {:?}",
                 style(&config_path.display().to_string()).yellow()
             );
@@ -94,7 +92,8 @@ impl Default for Config {
 }
 
 pub fn get_default_config_path() -> Option<PathBuf> {
-    dirs::config_dir().map(|dir| dir.join(DEFAULT_CONFIG_DIR).join(DEFAULT_CONFIG_FILENAME))
+    shared_kit_common::dirs::config_dir()
+        .map(|dir| dir.join(DEFAULT_CONFIG_DIR).join(DEFAULT_CONFIG_FILENAME))
 }
 
 fn parse_config(path: &PathBuf) -> Result<ConfigMetadata> {
@@ -104,8 +103,13 @@ fn parse_config(path: &PathBuf) -> Result<ConfigMetadata> {
 
     let content = fs::read_to_string(&path)
         .with_context(|| format!("Failed to read config file at {:?}", path))?;
-    let config: ConfigMetadata = toml::from_str(&content)
-        .with_context(|| format!("Failed to parse config TOML from {:?}", path))?;
+
+    let config: ConfigMetadata = if path.ends_with(".json") {
+        todo!("Write json parse")
+    } else {
+        toml::from_str(&content)
+            .with_context(|| format!("Failed to parse config TOML from {:?}", path))?
+    };
 
     Ok(config)
 }

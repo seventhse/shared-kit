@@ -1,5 +1,7 @@
 use anyhow::{Context, Ok};
 use clap::Args;
+use shared_kit_common::matcher::{Matcher, MatcherBuilder};
+use shared_kit_common::{log_error, log_info};
 use std::env;
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -9,11 +11,10 @@ use crate::components::new_command::{
 };
 use crate::components::progress::copy_directory_with_progress;
 use crate::config::Config;
-use crate::constant::TemplateKind;
-use crate::helper::matcher::PatternSpec;
-use crate::helper::matcher_group::MatcherGroup;
-use crate::helper::path::expand_dir;
+use crate::constant::{TemplateItem, TemplateKind};
+use crate::helper::file_transform_middleware::FileMatcherItem;
 use crate::helper::repo::resolve_repo_to_dir;
+use shared_kit_common::file_utils::path::expand_dir;
 
 #[derive(Args, Debug)]
 pub struct NewCommand {
@@ -45,7 +46,7 @@ pub fn new_command_action(config: &mut Config, args: &NewCommand) -> anyhow::Res
     let mut target = env::current_dir()?.join(&args.name);
     target = ensure_target_directory(target)?;
 
-    info_msg!("📁 Project will be created in: '{}'", target.display());
+    log_info!("📁 Project will be created in: '{}'", target.display());
 
     if try_apply_direct_template(&target, args.template.clone(), None)? {
         return Ok(());
@@ -55,30 +56,40 @@ pub fn new_command_action(config: &mut Config, args: &NewCommand) -> anyhow::Res
         return Ok(());
     }
 
-    let new_template = ensure_template_selected(&config, args)?;
+    let new_template_item = ensure_template_selected(&config, args)?;
 
-    let resolved_vars = ensure_replace_var_input(&new_template)
+    let file_matches = ensure_replace_var_input(&new_template_item)
         .with_context(|| format!("Failed to input replace var"))?;
 
-    let matcher_group = MatcherGroup::from_resolved(
-        PatternSpec::from_option_vec(new_template.includes.clone()),
-        PatternSpec::from_option_vec(new_template.excludes.clone()),
-        resolved_vars,
-    )
-    .with_context(|| format!("Failed to create matcher group"))?;
+    try_apply_direct(&target, new_template_item, file_matches)
+}
 
-    let matcher_group = Arc::new(matcher_group);
+fn try_apply_direct(
+    target: &PathBuf,
+    template_item: TemplateItem,
+    file_matches: Vec<FileMatcherItem>,
+) -> anyhow::Result<()> {
+    let mut matcher_builder: MatcherBuilder<FileMatcherItem> = MatcherBuilder::new()
+        .with_exclude_strs_opt(template_item.includes, None)
+        .with_exclude_strs_opt(template_item.excludes, None);
 
-    if try_apply_direct_template(
-        &target,
-        new_template.template.clone(),
-        Some(matcher_group.clone()),
-    )? {
-        return Ok(());
+    for file_matcher in file_matches {
+        matcher_builder = matcher_builder
+            .with_include_strs(file_matcher.includes.clone(), Some(file_matcher.clone()));
     }
 
-    if try_apply_direct_repo(&target, new_template.repo.clone(), Some(matcher_group.clone()))? {
-        return Ok(());
+    let matcher = Arc::new(matcher_builder.build());
+
+    let mut result =
+        try_apply_direct_template(target, template_item.template, Some(matcher.clone()))?;
+
+    if !result {
+        result = try_apply_direct_repo(target, template_item.repo, Some(matcher.clone()))?;
+    }
+
+    if result && template_item.completed_script.is_some() {
+        let _computed_script = template_item.completed_script.unwrap();
+        todo!("exec computed script")
     }
 
     Ok(())
@@ -87,7 +98,7 @@ pub fn new_command_action(config: &mut Config, args: &NewCommand) -> anyhow::Res
 fn try_apply_direct_template(
     target: &PathBuf,
     template: Option<String>,
-    matcher_group: Option<Arc<MatcherGroup>>,
+    matcher: Option<Arc<Matcher<FileMatcherItem>>>,
 ) -> anyhow::Result<bool> {
     if template.is_none() {
         return Ok(false);
@@ -97,13 +108,15 @@ fn try_apply_direct_template(
         .with_context(|| format!("Failed to expand template path: {}", template_path))?;
 
     if !path.exists() {
-        anyhow::bail!(
+        log_error!(
             "❌ Template path does not exist: '{}'. Please check the path and try again.",
             path.display()
         );
+
+        return Ok(false);
     }
 
-    copy_directory_with_progress(&path, &target, matcher_group)?;
+    copy_directory_with_progress(&path, &target, matcher)?;
 
     Ok(true)
 }
@@ -111,7 +124,7 @@ fn try_apply_direct_template(
 fn try_apply_direct_repo(
     target: &PathBuf,
     repo: Option<String>,
-    matcher_group: Option<Arc<MatcherGroup>>,
+    matcher: Option<Arc<Matcher<FileMatcherItem>>>,
 ) -> anyhow::Result<bool> {
     if repo.is_none() {
         return Ok(false);
@@ -121,7 +134,7 @@ fn try_apply_direct_repo(
 
     let repo = resolve_repo_to_dir(&repo_url)?;
 
-    copy_directory_with_progress(&repo.root_dir, target, matcher_group)?;
+    copy_directory_with_progress(&repo.root_dir, target, matcher)?;
 
     Ok(true)
 }

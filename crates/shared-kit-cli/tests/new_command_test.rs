@@ -16,6 +16,10 @@ fn dummy_config_with_template(template_path: PathBuf) -> Config {
             kind: TemplateKind::Project,
             template: Some(template_path.to_string_lossy().to_string()),
             repo: None,
+            includes: None,
+            excludes: None,
+            completed_script: None,
+            template_vars: None,
         },
     );
 

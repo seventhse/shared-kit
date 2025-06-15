@@ -7,8 +7,7 @@ use std::path::PathBuf;
 
 use crate::config::Config;
 use crate::constant::TemplateItem;
-use crate::helper::matcher::PatternSpec;
-use crate::helper::matcher_group::ResolvedVar;
+use crate::helper::file_transform_middleware::FileMatcherItem;
 use crate::subcommand::new_command::NewCommand;
 
 #[derive(Debug, Clone)]
@@ -113,8 +112,8 @@ pub fn ensure_template_selected(
     Ok(template.clone())
 }
 
-pub fn ensure_replace_var_input(template: &TemplateItem) -> anyhow::Result<Vec<ResolvedVar>> {
-    let mut resolved_vars: Vec<ResolvedVar> = vec![];
+pub fn ensure_replace_var_input(template: &TemplateItem) -> anyhow::Result<Vec<FileMatcherItem>> {
+    let mut file_matcher_items: Vec<FileMatcherItem> = vec![];
 
     if let Some(vars) = &template.template_vars {
         for var in vars {
@@ -132,16 +131,15 @@ pub fn ensure_replace_var_input(template: &TemplateItem) -> anyhow::Result<Vec<R
                 Text::new(&message).prompt().unwrap_or_else(|_| "".to_string())
             };
 
-            let resolve_var = ResolvedVar {
-                placeholder: placeholder,
-                replacement: input,
-                includes: PatternSpec::from_option_vec(var.includes_paths.clone()),
-                excludes: PatternSpec::from_option_vec(var.excludes_paths.clone()),
+            let file_match_item = FileMatcherItem {
+                pattern_val: placeholder,
+                includes: var.includes_paths.clone().unwrap_or(vec![]),
+                replace_val: input,
             };
 
-            resolved_vars.push(resolve_var);
+            file_matcher_items.push(file_match_item);
         }
     }
 
-    Ok(resolved_vars)
+    Ok(file_matcher_items)
 }

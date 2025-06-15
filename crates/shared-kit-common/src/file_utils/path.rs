@@ -5,6 +5,8 @@ use std::{
     path::{Path, PathBuf},
 };
 
+use crate::file_utils::error::FileError;
+
 pub fn expand_dir(path: &str) -> Option<PathBuf> {
     if let Some(stripped) = path.strip_prefix("~/") {
         home_dir().map(|home| home.join(stripped))
@@ -29,6 +31,20 @@ pub fn join_with_config_dir(config_path: Option<&Path>, relative: &Path) -> Path
     };
 
     path.clean()
+}
+
+pub fn to_relative_path(origin: &Path, absolute: &Path) -> Result<PathBuf, FileError> {
+    let origin_canon = origin.canonicalize().map_err(|e| FileError::Io(e))?;
+
+    let absolute_canon = absolute.canonicalize().map_err(|e| FileError::Io(e))?;
+
+    absolute_canon.strip_prefix(&origin_canon).map(|p| p.to_path_buf()).map_err(|_| {
+        FileError::NotDirectory(format!(
+            "Path '{}' is not under origin '{}'",
+            absolute_canon.display(),
+            origin_canon.display()
+        ))
+    })
 }
 
 #[cfg(test)]

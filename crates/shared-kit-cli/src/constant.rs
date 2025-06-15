@@ -29,11 +29,6 @@ pub struct TemplateVar {
 
     /// Optional list of glob patterns specifying files where this variable **should** be replaced.
     pub includes_paths: Option<Vec<String>>,
-
-    /// Optional list of glob patterns specifying files where this variable **should NOT** be replaced.
-    pub excludes_paths: Option<Vec<String>>,
-
-    pub completed_script: Option<Vec<String>>,
 }
 
 /// A type alias for a list of template variables.
@@ -53,6 +48,7 @@ pub struct TemplateItem {
     pub includes: Option<Vec<String>>,
     pub excludes: Option<Vec<String>>,
     pub template_vars: Option<TemplateVars>,
+    pub completed_script: Option<Vec<String>>,
 }
 
 /// A map of template names to their corresponding `TemplateItem`.

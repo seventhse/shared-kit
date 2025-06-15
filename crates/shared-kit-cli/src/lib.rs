@@ -1,17 +1,17 @@
+use shared_kit_common::log_error;
+
 use crate::cli::run_cli;
 
-#[macro_use]
 mod helper;
 pub mod config;
 pub mod constant;
 pub mod subcommand;
 
-mod components;
-mod utils;
 mod cli;
+mod components;
 
 pub fn shared_kit_cli() {
     if let Err(e) = run_cli() {
-        error_msg!("{}", e.to_string())
+        log_error!("{}", e.to_string())
     }
 }
