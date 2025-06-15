@@ -6,8 +6,7 @@ use std::{
 
 use anyhow::{Context, Ok, Result};
 use serde::{Deserialize, Serialize};
-use shared_kit_common::log_warn;
-use shared_kit_common::{console::style, file_utils::path::expand_dir};
+use shared_kit_common::{console::style, file_utils::path::expand_dir, log_warn};
 
 use crate::constant::{DEFAULT_CONFIG_DIR, DEFAULT_CONFIG_FILENAME, TemplateKind, Templates};
 

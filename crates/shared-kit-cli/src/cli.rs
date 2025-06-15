@@ -7,7 +7,7 @@ use crate::{
 };
 use anyhow::{Context, Result};
 use clap::{Parser, Subcommand};
-use shared_kit_common::tracing::Level;
+use shared_kit_common::{log_info, tracing::Level};
 
 #[derive(Parser)]
 #[command(
@@ -35,15 +35,10 @@ enum Commands {
 
 pub fn run_cli() -> Result<()> {
     let user_home_dir = shared_kit_common::dirs::home_dir().unwrap();
-    let _guard = shared_kit_common::logger::init_logger(
-        Some(PathBuf::from(format!(
-            "{}/{}/logs",
-            user_home_dir.to_string_lossy(),
-            DEFAULT_CONFIG_DIR
-        ))),
-        Level::INFO,
-        Level::DEBUG,
-    );
+    let log_path =
+        PathBuf::from(format!("{}/{}/logs", user_home_dir.to_string_lossy(), DEFAULT_CONFIG_DIR));
+    log_info!("Log path: {}", &log_path.display());
+    let _guard = shared_kit_common::logger::init_logger(Some(log_path), Level::INFO, Level::DEBUG);
 
     let cli = SharedKitCli::parse();
     let mut config =

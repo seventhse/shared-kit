@@ -52,6 +52,14 @@ excludes = [
   "regex:^\\..*\\.swp$"
 ]
 
+# Optional: Commands to run after the template has been fully generated and variables substituted.
+# Each entry is a shell command or keyword. Can be used for post-processing steps like dependency installation,
+# setting permissions, or initializing git.
+# Example: ["CD_TARGET", "pnpm i"] means switch to the generated project directory and run `pnpm install`.
+completed_script = ["CD_TARGET","pnpm i"]
+
+
+
 # Define variable substitutions for this template
 [[templates.package-example.template_vars]]
 # Required: The placeholder used in the template (e.g., {{project_name}})
@@ -63,25 +71,12 @@ prompt = "Please input your new project name"
 # Optional: A default value to use if no input is provided
 default = "new_project"
 
-# Optional: Commands to run after the template has been fully generated and variables substituted.
-# Each entry is a shell command or keyword. Can be used for post-processing steps like dependency installation,
-# setting permissions, or initializing git.
-# Example: ["CD_TARGET", "pnpm i"] means switch to the generated project directory and run `pnpm install`.
-completed_script = ["CD_TARGET","pnpm i"]
-
 # Optional: Limit replacement to specific files only
 # Supports regex by prefixing with `regex:`
 includes_paths = [
   "package.json",
   "index.html",
   "regex:^.*\\.rs$"
-]
-
-# Optional: Skip replacement in these files
-# Supports regex by prefixing with `regex:`
-excludes_paths = [
-  "/node_modules",
-  "regex:^\\.git/"
 ]
 ```
 
@@ -117,10 +112,6 @@ excludes_paths = [
             "package.json",
             "index.html",
             "regex:^.*\\.rs$"
-          ],
-          "excludes_paths": [
-            "/node_modules",
-            "regex:^\\.git/"
           ]
         }
       ]

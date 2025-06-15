@@ -1,7 +1,7 @@
 use dirs::home_dir;
 use path_clean::PathClean;
 use std::{
-    env::{current_dir, current_exe},
+    env::current_dir,
     path::{Path, PathBuf},
 };
 
@@ -11,7 +11,11 @@ pub fn expand_dir(path: &str) -> Option<PathBuf> {
     if let Some(stripped) = path.strip_prefix("~/") {
         home_dir().map(|home| home.join(stripped))
     } else if let Some(stripped) = path.strip_prefix("./") {
-        current_exe().ok().and_then(|exe| exe.parent().map(|dir| dir.join(stripped)))
+        // TODO: Need check the path is dir or file
+        current_dir().ok().and_then(|exe| {
+            let res = exe.join(stripped);
+            Some(res)
+        })
     } else if let Some(stripped) = path.strip_prefix("../") {
         current_dir().ok().map(|dir| dir.join("..").join(stripped))
     } else if path.eq("~") {
