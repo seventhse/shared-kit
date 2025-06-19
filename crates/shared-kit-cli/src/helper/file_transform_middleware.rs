@@ -38,7 +38,6 @@ impl Middleware<FileTransformContext, FileTransformKind> for FileTransformMiddle
 
         if let Ok(relative_path) = relative_path {
             let result = self.matcher.is_match(&relative_path.to_string_lossy());
-
             if let Ok(matcher_result) = result {
                 match matcher_result {
                     MatcherResult::Matched(data) => {

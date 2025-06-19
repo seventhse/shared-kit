@@ -6,6 +6,8 @@ pub const DEFAULT_CONFIG_DIR: &str = "shared-kit-cli";
 pub const DEFAULT_CONFIG_FILENAME: &str = "metadata.toml";
 
 #[derive(Debug, Clone, ValueEnum, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(rename_all = "lowercase")]
+#[clap(rename_all = "lowercase")]
 pub enum TemplateKind {
     Project,
     Monorepo,

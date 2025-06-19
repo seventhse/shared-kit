@@ -1,7 +1,7 @@
 use anyhow::{Context, Ok};
 use clap::Args;
 use shared_kit_common::matcher::{Matcher, MatcherBuilder};
-use shared_kit_common::{log_error, log_info};
+use shared_kit_common::{log_info, log_warn};
 use std::env;
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -14,7 +14,7 @@ use crate::config::Config;
 use crate::constant::{TemplateItem, TemplateKind};
 use crate::helper::file_transform_middleware::FileMatcherItem;
 use crate::helper::repo::resolve_repo_to_dir;
-use shared_kit_common::file_utils::path::expand_dir;
+use shared_kit_common::file_utils::path::compose_path;
 
 #[derive(Args, Debug)]
 pub struct NewCommand {
@@ -48,7 +48,7 @@ pub fn new_command_action(config: &mut Config, args: &NewCommand) -> anyhow::Res
 
     log_info!("📁 Project will be created in: '{}'", target.display());
 
-    if try_apply_direct_template(&target, args.template.clone(), None)? {
+    if try_apply_direct_template(&target, args.template.clone(), config, None)? {
         return Ok(());
     }
 
@@ -61,13 +61,14 @@ pub fn new_command_action(config: &mut Config, args: &NewCommand) -> anyhow::Res
     let file_matches = ensure_replace_var_input(&new_template_item)
         .with_context(|| format!("Failed to input replace var"))?;
 
-    try_apply_direct(&target, new_template_item, file_matches)
+    try_apply_direct(&target, new_template_item, file_matches, &config)
 }
 
 fn try_apply_direct(
     target: &PathBuf,
     template_item: TemplateItem,
     file_matches: Vec<FileMatcherItem>,
+    config: &Config,
 ) -> anyhow::Result<()> {
     let mut matcher_builder: MatcherBuilder<FileMatcherItem> = MatcherBuilder::new()
         .with_exclude_strs_opt(template_item.includes, None)
@@ -81,7 +82,7 @@ fn try_apply_direct(
     let matcher = Arc::new(matcher_builder.build());
 
     let mut result =
-        try_apply_direct_template(target, template_item.template, Some(matcher.clone()))?;
+        try_apply_direct_template(target, template_item.template, config, Some(matcher.clone()))?;
 
     if !result {
         result = try_apply_direct_repo(target, template_item.repo, Some(matcher.clone()))?;
@@ -98,18 +99,27 @@ fn try_apply_direct(
 fn try_apply_direct_template(
     target: &PathBuf,
     template: Option<String>,
+    config: &Config,
     matcher: Option<Arc<Matcher<FileMatcherItem>>>,
 ) -> anyhow::Result<bool> {
     if template.is_none() {
         return Ok(false);
     }
-    let template_path = template.unwrap();
-    let path = expand_dir(&template_path)
-        .with_context(|| format!("Failed to expand template path: {}", template_path))?;
+    let template_path = PathBuf::from(template.unwrap());
+    let current_config_path = config.current_config_path.clone().unwrap();
+    let path = compose_path(&current_config_path.parent().unwrap(), &template_path);
+
+    if path.is_none() {
+        log_warn!("Template path is error, please check.");
+
+        return Ok(false);
+    }
+
+    let path = path.unwrap();
 
     if !path.exists() {
-        log_error!(
-            "❌ Template path does not exist: '{}'. Please check the path and try again.",
+        log_warn!(
+            "Template path does not exist: '{}'. Please check the path and try again.",
             path.display()
         );
 

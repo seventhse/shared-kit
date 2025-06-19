@@ -37,6 +37,20 @@ pub fn join_with_config_dir(config_path: Option<&Path>, relative: &Path) -> Path
     path.clean()
 }
 
+pub fn compose_path(relative: &Path, path: &Path) -> Option<PathBuf> {
+    if path.strip_prefix("~").is_ok() {
+        return expand_dir(&path.to_string_lossy());
+    }
+    if let Ok(stripped) = path.strip_prefix("./") {
+        return Some(relative.join(stripped));
+    }
+    if let Ok(stripped) = path.strip_prefix("../") {
+        return Some(relative.join("..").join(stripped));
+    }
+
+    Some(PathBuf::from(path))
+}
+
 pub fn to_relative_path(origin: &Path, absolute: &Path) -> Result<PathBuf, FileError> {
     let origin_canon = origin.canonicalize().map_err(|e| FileError::Io(e))?;
 

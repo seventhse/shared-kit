@@ -6,7 +6,7 @@ use std::{
 
 use anyhow::{Context, Ok, Result};
 use serde::{Deserialize, Serialize};
-use shared_kit_common::{console::style, file_utils::path::expand_dir, log_warn};
+use shared_kit_common::{console::style, file_utils::path::expand_dir, log_error, log_warn};
 
 use crate::constant::{DEFAULT_CONFIG_DIR, DEFAULT_CONFIG_FILENAME, TemplateKind, Templates};
 
@@ -100,15 +100,46 @@ fn parse_config(path: &PathBuf) -> Result<ConfigMetadata> {
         anyhow::bail!("The config path is not a valid file: {:?}", path);
     }
 
-    let content = fs::read_to_string(&path)
-        .with_context(|| format!("Failed to read config file at {:?}", path))?;
+    let content = fs::read_to_string(&path).with_context(|| {
+        let error_msg = format!("Failed to read config file at {:?}", path);
+        log_error!("{}", &error_msg);
+        error_msg
+    })?;
 
     let config: ConfigMetadata = if path.ends_with(".json") {
         todo!("Write json parse")
     } else {
-        toml::from_str(&content)
-            .with_context(|| format!("Failed to parse config TOML from {:?}", path))?
+        toml::from_str(&content).with_context(|| {
+            let error_msg = format!("Failed to parse config TOML from {:?}", path);
+            log_error!("{}", &error_msg);
+            error_msg
+        })?
     };
 
     Ok(config)
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::config::ConfigMetadata;
+
+    #[test]
+    fn test_toml_parse_config() {
+        let config_str = r#"
+[templates.my-app]
+kind = "project"
+template = "./basic-project"
+includes = ["src/**", "package.json"]
+excludes = ["target/**", "node_modules"]
+
+[[templates.my-app.template_vars]]
+placeholder = "{{project_name}}"
+prompt = "Please input your new project name"
+default = "new_project"
+includes_paths = ["package.json"]
+        "#;
+
+        let config: ConfigMetadata = toml::from_str(config_str).unwrap();
+        println!("{:#?}", config);
+    }
 }

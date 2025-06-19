@@ -12,6 +12,6 @@ mod components;
 
 pub fn shared_kit_cli() {
     if let Err(e) = run_cli() {
-        log_error!("{}", e.to_string())
+        log_error!("cli run error: {}", e.to_string())
     }
 }

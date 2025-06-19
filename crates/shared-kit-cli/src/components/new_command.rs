@@ -87,7 +87,7 @@ pub fn ensure_template_selected(
 
     let selected = if atty::is(Stream::Stdin) {
         // 正常交互
-        inquire::Select::new("📦 Select a template to use", options.clone())
+        inquire::Select::new("📦 Select a template to use ", options.clone())
             .prompt()
             .with_context(|| "Failed to select a template")?
     } else {
@@ -121,6 +121,7 @@ pub fn ensure_replace_var_input(template: &TemplateItem) -> anyhow::Result<Vec<F
             let message = var
                 .prompt
                 .clone()
+                .map(|prompt| format!("Replace template var \n {}:", prompt))
                 .unwrap_or_else(|| format!("Enter new value for {}", placeholder));
 
             let default = var.default.clone();
