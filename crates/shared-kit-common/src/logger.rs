@@ -23,7 +23,7 @@ pub fn init_logger<P: AsRef<Path>>(
     console_level: Level,
     file_level: Level,
 ) -> Option<WorkerGuard> {
-    let env_filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info"));
+    let env_filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("debug"));
 
     let offset = local_offset();
     let timer = OffsetTime::new(
@@ -70,6 +70,7 @@ pub fn init_logger<P: AsRef<Path>>(
         }
     }
 }
+
 /// 简单控制台日志初始化
 pub fn init_simple_logger(console_level: Level) {
     init_logger::<&str>(None, console_level, Level::ERROR);
@@ -109,6 +110,43 @@ macro_rules! log_msg_inner {
             $crate::console::style(format!($($arg)*)).blue()
         );
     };
+}
+
+#[macro_export]
+macro_rules! output {
+    // 标题行输出（带 emoji）
+    (title: $title:expr) => {{
+        println!("\n{}:", $title);
+    }};
+
+    // 普通提示行输出，带缩进
+    (line: $($arg:tt)*) => {{
+        println!("  {}", format!($($arg)*));
+    }};
+
+    // 空行
+    (space) => {{
+        println!();
+    }};
+
+    // 默认值提示
+    (prompt: $label:expr, default = $default:expr) => {{
+        println!("  {} [default: {}]", $label, $default);
+    }};
+
+    // 选项展示
+    (options: $($opt:expr),+ $(,)?) => {{
+        println!("  Options:");
+        $(
+            println!("    → {}", $opt);
+        )+
+    }};
+
+    (error: $($arg:tt)*) => {{
+        use $crate::console::style;
+        let msg = format!($($arg)*);
+        println!("{} {}", style("  ✖").red().bold(), style(msg).red().bold());
+    }};
 }
 
 #[macro_export]

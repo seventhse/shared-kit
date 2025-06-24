@@ -8,12 +8,13 @@ use std::{
 use anyhow::Context;
 use indicatif::{ProgressBar, ProgressStyle};
 use reqwest::blocking::Response;
+use shared_kit_common::file_utils::count::pre_count_files;
 use shared_kit_common::{
     file_utils::copy::{FileTransformKind, copy_directory_with_transform},
-    matcher::{Matcher},
+    log_debug,
+    matcher::Matcher,
     middleware_pipeline::MiddlewarePipeline,
 };
-use shared_kit_common::{file_utils::count::pre_count_files, log_info};
 
 use crate::helper::file_transform_middleware::{
     FileMatcherItem, FileProgressMiddleware, FileTransformMiddleware,
@@ -24,25 +25,26 @@ pub fn create_file_progress(path: &PathBuf) -> anyhow::Result<ProgressBar> {
     let pb = ProgressBar::new(total_files as u64);
     pb.set_style(
         ProgressStyle::with_template(
-            "[{elapsed_precise}] [{bar:40.green/blue}] {pos}/{len} files | {msg}",
+            "\n  [{elapsed_precise}] 🛠️ [{bar:40.green/blue}] {pos}/{len} files | {msg}",
         )
         .unwrap(),
     );
+    pb.set_message("Copying files...");
 
     Ok(pb)
 }
 
 pub fn create_download_progress(resp: &Response) -> anyhow::Result<ProgressBar> {
-    let total_size =
-        resp.content_length().with_context(|| "Failed to get content length from response")?;
+    let total_size = resp.content_length().unwrap_or(u64::MAX);
     let pb = ProgressBar::new(total_size);
     pb.set_style(
         ProgressStyle::with_template(
-            "[{elapsed_precise}] [{bar:40.cyan/blue}] {bytes}/{total_bytes} ({eta})",
+            "[{elapsed_precise}] 📦 [{bar:40.cyan/blue}] {bytes}/{total_bytes} ({eta})",
         )
         .unwrap()
         .progress_chars("##-"),
     );
+    pb.set_message("Downloading...");
 
     Ok(pb)
 }
@@ -66,7 +68,7 @@ pub fn download_file_with_progress(resp: Response, dest_path: &Path) -> anyhow::
         pb.set_position(downloaded);
     }
 
-    pb.finish_with_message("Download complete");
+    pb.finish_with_message("✅ Download complete!");
 
     Ok(())
 }
@@ -82,27 +84,23 @@ pub fn copy_directory_with_progress(
     let file_progress_middleware = FileProgressMiddleware::new(origin.clone(), pb.clone());
 
     let handle = MiddlewarePipeline::new()
-        .add_option(matcher.map(|matcher| FileTransformMiddleware::new(origin.clone(), matcher)))
         .add(file_progress_middleware)
+        .add_option(matcher.map(|matcher| FileTransformMiddleware::new(origin.clone(), matcher)))
         .finalize(|_ctx| FileTransformKind::NoChange);
 
     copy_directory_with_transform(origin, target, Some(&handle))
-        .with_context(|| format!("Failed to copying..."))?;
+        .with_context(|| "Failed to copy files")?;
 
     let total_files = pb.length().unwrap_or(0);
 
-    log_info!(
+    log_debug!(
         "✅ Template copied from '{}' to '{}' ({} files)",
         origin.display(),
         target.display(),
         total_files
     );
-    pb.finish_with_message(format!(
-        "\nTemplate copy complete: '{}' → '{}' ({} files)",
-        origin.display(),
-        target.display(),
-        total_files
-    ));
+
+    pb.finish_with_message("Done \n");
 
     Ok(())
 }

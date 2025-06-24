@@ -1,13 +1,10 @@
-use std::path::PathBuf;
-
 use crate::{
-    config::Config,
-    constant::DEFAULT_CONFIG_DIR,
+    config::{Config, get_default_log_path},
     subcommand::new_command::{NewCommand, new_command_action},
 };
 use anyhow::{Context, Result};
 use clap::{Parser, Subcommand};
-use shared_kit_common::{log_info, tracing::Level};
+use shared_kit_common::{log_debug, tracing::Level};
 
 #[derive(Parser)]
 #[command(
@@ -34,11 +31,12 @@ enum Commands {
 }
 
 pub fn run_cli() -> Result<()> {
-    let user_home_dir = shared_kit_common::dirs::home_dir().unwrap();
-    let log_path =
-        PathBuf::from(format!("{}/{}/logs", user_home_dir.to_string_lossy(), DEFAULT_CONFIG_DIR));
-    log_info!("Log path: {}", &log_path.display());
-    let _guard = shared_kit_common::logger::init_logger(Some(log_path), Level::INFO, Level::DEBUG);
+    let log_path = get_default_log_path();
+    let _guard =
+        shared_kit_common::logger::init_logger(Some(log_path.clone()), Level::INFO, Level::DEBUG);
+
+    log_debug!("============== Start run cli ========================");
+    log_debug!("Log path: {}", &log_path.display());
 
     let cli = SharedKitCli::parse();
     let mut config =

@@ -3,7 +3,7 @@ use std::path::{Path, PathBuf};
 
 use anyhow::Context;
 use reqwest::blocking::Client;
-use shared_kit_common::log_warn;
+use shared_kit_common::{log_warn, log_debug};
 use tempfile::TempDir;
 
 use crate::components::progress::download_file_with_progress;
@@ -48,23 +48,30 @@ impl RepoInfo {
 
         match self.platform {
             RepoPlatform::GitHub => {
-                format!(
+                let url = format!(
                     "https://github.com/{}/{}/archive/refs/heads/{}.zip",
                     self.user, self.repo, reference
-                )
+                );
+                log_debug!("GitHub download URL: {}", url);
+                url
             }
             RepoPlatform::GitLab => {
-                format!(
+                let url = format!(
                     "https://gitlab.com/{}/{}/-/archive/{}/{}-{}.zip",
                     self.user, self.repo, reference, self.repo, reference
-                )
+                );
+                log_debug!("GitLab download URL: {}", url);
+                url
             }
             RepoPlatform::Gitea => {
-                format!("https://gitea.com/{}/{}/archive/{}.zip", self.user, self.repo, reference)
+                let url = format!("https://gitea.com/{}/{}/archive/{}.zip", self.user, self.repo, reference);
+                log_debug!("Gitea download URL: {}", url);
+                url
             }
             RepoPlatform::Other(ref domain) => {
                 // 其他平台不支持直接下载zip，可以自定义处理或返回空串
                 log_warn!("Warning: unsupported platform {}, fallback to empty url", domain);
+                log_debug!("Other platform download URL: empty");
                 String::new()
             }
         }
@@ -106,6 +113,7 @@ impl RepoInfo {
 /// ```
 ///
 pub fn parse_repo_input(input: &String) -> anyhow::Result<RepoInfo> {
+    log_debug!("parse_repo_input input: {}", input);
     // Try to parse URL form
     if input.starts_with("http://") || input.starts_with("https://") {
         parse_from_url(input)
@@ -115,6 +123,7 @@ pub fn parse_repo_input(input: &String) -> anyhow::Result<RepoInfo> {
 }
 
 pub fn parse_from_url(input: &String) -> anyhow::Result<RepoInfo> {
+    log_debug!("parse_from_url input: {}", input);
     let raw: &str = input.as_str(); // or &input[..]
     let mut base = raw;
     let mut suffix: Option<(&str, &str)> = None;
@@ -157,10 +166,13 @@ pub fn parse_from_url(input: &String) -> anyhow::Result<RepoInfo> {
         _ => GitRef::Default,
     };
 
+    log_debug!("Parsed URL info - host: {}, user: {}, repo: {}, platform: {:?}, ref: {:?}", host, user, repo, platform, r#ref);
+
     Ok(RepoInfo { platform, user, repo, r#ref })
 }
 
 pub fn parse_from_short(input: &String) -> anyhow::Result<RepoInfo> {
+    log_debug!("parse_from_short input: {}", input);
     let re = shared_kit_common::regex::Regex::new(
         r"^(?P<user>[^/\s]+)/(?P<repo>[^\s@#]+)([@#](?P<ref>[^\s]+))?$",
     )?;
@@ -183,6 +195,8 @@ pub fn parse_from_short(input: &String) -> anyhow::Result<RepoInfo> {
         None => GitRef::Default,
     };
 
+    log_debug!("Parsed short info - user: {}, repo: {}, ref: {:?}", user, repo, r#ref);
+
     Ok(RepoInfo { platform: RepoPlatform::GitHub, user, repo, r#ref })
 }
 
@@ -191,10 +205,12 @@ fn is_probable_commit(s: &str) -> bool {
 }
 
 fn find_root_dir(extract_dir: &Path) -> anyhow::Result<PathBuf> {
+    log_debug!("Reading extract directory: {:?}", extract_dir);
     let entries = fs::read_dir(extract_dir).context("Failed to read extract dir")?;
     for entry in entries {
         let entry = entry.context("Failed to read dir entry")?;
         if entry.path().is_dir() {
+            log_debug!("Found root directory: {:?}", entry.path());
             return Ok(entry.path());
         }
     }
@@ -202,13 +218,17 @@ fn find_root_dir(extract_dir: &Path) -> anyhow::Result<PathBuf> {
 }
 
 fn extract_zip(zip_path: &Path, extract_dir: &Path) -> anyhow::Result<()> {
+    log_debug!("Extracting zip file {:?} to {:?}", zip_path, extract_dir);
     std::fs::create_dir_all(extract_dir).context("Failed to create extract dir")?;
     let zip_file = std::fs::File::open(zip_path).context("Failed to open zip file")?;
     let mut archive = zip::ZipArchive::new(zip_file).context("Failed to read zip archive")?;
-    archive.extract(extract_dir).context("Failed to extract zip archive")
+    archive.extract(extract_dir).context("Failed to extract zip archive")?;
+    log_debug!("Extraction completed");
+    Ok(())
 }
 
 fn download_zip_to_path(url: &str, dest_path: &Path) -> anyhow::Result<()> {
+    log_debug!("Downloading zip from URL: {}", url);
     let client = Client::new();
     let resp =
         client.get(url).send().with_context(|| format!("Failed to send GET request to {}", url))?;
@@ -217,10 +237,13 @@ fn download_zip_to_path(url: &str, dest_path: &Path) -> anyhow::Result<()> {
         anyhow::bail!("Failed to download repo zip: HTTP {}", resp.status());
     }
 
-    download_file_with_progress(resp, dest_path)
+    download_file_with_progress(resp, dest_path)?;
+    log_debug!("Download completed and saved to {:?}", dest_path);
+    Ok(())
 }
 
 fn download_and_extract_zip(download_url: &str) -> anyhow::Result<ExtractedRepo> {
+    log_debug!("Starting download and extract for URL: {}", download_url);
     let tmp_dir = tempfile::tempdir().context("Failed to create temp dir")?;
     let zip_path = tmp_dir.path().join("repo.zip");
 
@@ -236,14 +259,18 @@ fn download_and_extract_zip(download_url: &str) -> anyhow::Result<ExtractedRepo>
 }
 
 pub fn resolve_repo_to_dir(url: &String) -> anyhow::Result<ExtractedRepo> {
+    log_debug!("resolve_repo_to_dir called with URL: {}", url);
     let repo_info = parse_repo_input(&url)?;
+    log_debug!("Parsed RepoInfo: {:?}", repo_info);
     let download_url = repo_info.download_url();
+    log_debug!("Generated download URL: {}", download_url);
 
     if download_url.is_empty() {
         anyhow::bail!("Unsupported repo platform for direct zip download");
     }
 
     let res = download_and_extract_zip(&download_url)?;
+    log_debug!("Downloaded and extracted repo to {:?}", res.root_dir);
     Ok(res)
 }
 

@@ -4,9 +4,9 @@ use std::{
     path::PathBuf,
 };
 
-use anyhow::{Context, Ok, Result};
+use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
-use shared_kit_common::{console::style, file_utils::path::expand_dir, log_error, log_warn};
+use shared_kit_common::{console::style, file_utils::path::expand_dir, log_debug, log_error};
 
 use crate::constant::{DEFAULT_CONFIG_DIR, DEFAULT_CONFIG_FILENAME, TemplateKind, Templates};
 
@@ -61,13 +61,13 @@ impl Config {
         let config_path = match config_path {
             Some(p) => p,
             None => {
-                log_warn!("No config path provided; using default configuration.");
+                log_debug!("No config path provided; using default configuration.");
                 return Ok((config_path, ConfigMetadata::default()));
             }
         };
 
         if !config_path.exists() {
-            log_warn!(
+            log_debug!(
                 "Config file not found at: {:?}",
                 style(&config_path.display().to_string()).yellow()
             );
@@ -95,6 +95,11 @@ pub fn get_default_config_path() -> Option<PathBuf> {
         .map(|dir| dir.join(DEFAULT_CONFIG_DIR).join(DEFAULT_CONFIG_FILENAME))
 }
 
+pub fn get_default_log_path() -> PathBuf {
+    let user_home_dir = shared_kit_common::dirs::home_dir().unwrap();
+    PathBuf::from(format!("{}/{}/logs", user_home_dir.to_string_lossy(), DEFAULT_CONFIG_DIR))
+}
+
 fn parse_config(path: &PathBuf) -> Result<ConfigMetadata> {
     if !&path.is_file() {
         anyhow::bail!("The config path is not a valid file: {:?}", path);
@@ -106,14 +111,26 @@ fn parse_config(path: &PathBuf) -> Result<ConfigMetadata> {
         error_msg
     })?;
 
-    let config: ConfigMetadata = if path.ends_with(".json") {
-        todo!("Write json parse")
+    let is_json = path.extension().and_then(|ext| ext.to_str()) == Some("json");
+
+    let config: ConfigMetadata = if is_json {
+        match serde_json::from_str(&content) {
+            Ok(cfg) => cfg,
+            Err(e) => {
+                log_debug!("Failed to parse config JSON from {:?}: {:#?}", path, e);
+                return Err(anyhow::Error::new(e)
+                    .context(format!("Failed to parse config JSON from {:#?}", path)));
+            }
+        }
     } else {
-        toml::from_str(&content).with_context(|| {
-            let error_msg = format!("Failed to parse config TOML from {:?}", path);
-            log_error!("{}", &error_msg);
-            error_msg
-        })?
+        match toml::from_str(&content) {
+            Ok(cfg) => cfg,
+            Err(e) => {
+                log_debug!("Failed to parse config TOML from {:?}: {:?}", path, e);
+                return Err(anyhow::Error::new(e)
+                    .context(format!("Failed to parse config TOML from {:?}", path)));
+            }
+        }
     };
 
     Ok(config)

@@ -1,10 +1,12 @@
 use anyhow::{Context, Ok};
 use atty::Stream;
 use inquire::{Select, Text};
+use shared_kit_common::output;
 use std::fmt::Display;
 use std::io::{self, BufRead};
 use std::path::PathBuf;
 
+use crate::components::ui::select_with_ui;
 use crate::config::Config;
 use crate::constant::TemplateItem;
 use crate::helper::file_transform_middleware::FileMatcherItem;
@@ -20,9 +22,9 @@ enum TargetDirExistAction {
 impl Display for TargetDirExistAction {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let label = match self {
-            TargetDirExistAction::Rename => "🔁 Rename the project directory",
-            TargetDirExistAction::Overwrite => "🧹 Overwrite the existing directory",
-            TargetDirExistAction::Cancel => "❌ Cancel operation",
+            TargetDirExistAction::Rename => "Rename the project directory",
+            TargetDirExistAction::Overwrite => "Overwrite the existing directory",
+            TargetDirExistAction::Cancel => "Cancel operation",
         };
         write!(f, "{}", label)
     }
@@ -30,16 +32,15 @@ impl Display for TargetDirExistAction {
 
 pub fn ensure_target_directory(mut target: PathBuf) -> anyhow::Result<PathBuf> {
     while target.exists() {
+        output!(title: "⚠️ Target directory already exists \n");
         let choices = vec![
             TargetDirExistAction::Rename,
             TargetDirExistAction::Overwrite,
             TargetDirExistAction::Cancel,
         ];
 
-        let selected =
-            Select::new("⚠️ Target directory already exists. What would you like to do?", choices)
-                .prompt()
-                .with_context(|| "Failed to get user selection")?;
+        let selected = select_with_ui("What would you like to do?", choices)
+            .with_context(|| "Failed to get user selection")?;
 
         match selected {
             TargetDirExistAction::Rename => {
@@ -56,7 +57,7 @@ pub fn ensure_target_directory(mut target: PathBuf) -> anyhow::Result<PathBuf> {
                 break;
             }
             TargetDirExistAction::Cancel => {
-                anyhow::bail!("Operation canceled by user.");
+                anyhow::bail!("❌ Operation canceled by user.");
             }
         }
     }
@@ -78,20 +79,20 @@ pub fn ensure_template_selected(
             .unwrap_or_else(|| "<none>".to_string());
 
         anyhow::bail!(
-            "❌ No templates found in config '{}'. Please check your config file or use --template/--repo to specify a template directly.",
+            "❌ No templates found in config '{}'.\nPlease check your config file or use --template / --repo to specify a template.",
             config_path_display
         );
     }
 
     let options: Vec<String> = available_templates.keys().map(|name| name.to_string()).collect();
 
+    output!(title: "📦 Select a template");
+    output!(space);
     let selected = if atty::is(Stream::Stdin) {
-        // 正常交互
-        inquire::Select::new("📦 Select a template to use ", options.clone())
+        Select::new("Choose one of the following templates:", options.clone())
             .prompt()
             .with_context(|| "Failed to select a template")?
     } else {
-        // 非交互测试：从 stdin 模拟读取
         let stdin = io::stdin();
         let mut lines = stdin.lock().lines();
         let input = lines
@@ -100,7 +101,7 @@ pub fn ensure_template_selected(
             .context("Failed to read simulated input from stdin")?
             .unwrap_or_default();
         if !options.contains(&input) {
-            anyhow::bail!("Invalid simulated input: '{}'", input);
+            anyhow::bail!("❌ Invalid template name in simulated input: '{}'", input);
         }
         input
     };
@@ -116,29 +117,43 @@ pub fn ensure_replace_var_input(template: &TemplateItem) -> anyhow::Result<Vec<F
     let mut file_matcher_items: Vec<FileMatcherItem> = vec![];
 
     if let Some(vars) = &template.template_vars {
-        for var in vars {
-            let placeholder = var.placeholder.clone();
-            let message = var
-                .prompt
-                .clone()
-                .map(|prompt| format!("Replace template var \n {}:", prompt))
-                .unwrap_or_else(|| format!("Enter new value for {}", placeholder));
+        if vars.is_empty() {
+            output!(title: "🔧 No variables to configure");
+            output!(line: "Using default values. Skipping input step.");
+        } else {
+            output!(title: "🔧 Configure Template Variables");
+            output!(space);
+            for var in vars {
+                let placeholder = var.placeholder.clone();
 
-            let default = var.default.clone();
+                let prompt_message = var
+                    .prompt
+                    .clone()
+                    .unwrap_or_else(|| format!("Please enter a value for `{}`", placeholder));
 
-            let input = if let Some(default_val) = default {
-                Text::new(&message).with_initial_value(&default_val).prompt().unwrap_or(default_val)
-            } else {
-                Text::new(&message).prompt().unwrap_or_else(|_| "".to_string())
-            };
+                let default_val = var.default.clone();
 
-            let file_match_item = FileMatcherItem {
-                pattern_val: placeholder,
-                includes: var.includes_paths.clone().unwrap_or(vec![]),
-                replace_val: input,
-            };
+                let message = if let Some(ref default_str) = default_val {
+                    format!("{} [default: {}]", prompt_message, default_str)
+                } else {
+                    prompt_message
+                };
 
-            file_matcher_items.push(file_match_item);
+                let input = if let Some(default_val) = default_val {
+                    Text::new(&message)
+                        .with_initial_value(&default_val)
+                        .prompt()
+                        .unwrap_or(default_val)
+                } else {
+                    Text::new(&message).prompt().unwrap_or_else(|_| "".to_string())
+                };
+
+                file_matcher_items.push(FileMatcherItem {
+                    pattern_val: placeholder,
+                    includes: var.includes_paths.clone().unwrap_or_default(),
+                    replace_val: input,
+                });
+            }
         }
     }
 

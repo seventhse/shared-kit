@@ -22,6 +22,7 @@ toml = "0.8.22"
 url = "2.5.4"
 zip = "4.0.0"
 shared-kit-common = { path = "../shared-kit-common" }
+serde_json = "1.0.140"
 
 [dev-dependencies]
 assert_cmd = "2.0.17"

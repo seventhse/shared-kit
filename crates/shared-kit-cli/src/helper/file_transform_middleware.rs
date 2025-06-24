@@ -6,6 +6,7 @@ use shared_kit_common::{
         copy::{FileTransformContext, FileTransformKind},
         path::to_relative_path,
     },
+    log_debug,
     matcher::{Matcher, MatcherResult},
     middleware_pipeline::Middleware,
 };
@@ -34,10 +35,16 @@ impl Middleware<FileTransformContext, FileTransformKind> for FileTransformMiddle
             dyn Fn(FileTransformContext) -> FileTransformKind + Send + Sync + 'static,
         >,
     ) -> FileTransformKind {
+        log_debug!("Context origin path: {:#?}", &ctx.origin);
         let relative_path = to_relative_path(&self.origin, &ctx.origin);
 
         if let Ok(relative_path) = relative_path {
             let result = self.matcher.is_match(&relative_path.to_string_lossy());
+            log_debug!(
+                "Relative path: {:#?} \n File transform result: {:#?}",
+                &relative_path,
+                result
+            );
             if let Ok(matcher_result) = result {
                 match matcher_result {
                     MatcherResult::Matched(data) => {

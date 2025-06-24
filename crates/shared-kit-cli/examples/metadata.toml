@@ -1,10 +1,16 @@
 [templates.my-app]
 kind = "project"
 template = "./basic-project"
-includes = ["./src/**/*", "./package.json"]
+# includes = ["./src/**/*", "./package.json"]
+includes = ["./package.json"]
+template_vars = [
+  { placeholder = "{{project_name}}", prompt = "Please input your new project name", default = "new_project", includes_paths = [
+    "package.json",
+  ] },
+]
 
-[[templates.my-app.template_vars]]
-placeholder = "{{project_name}}"
-prompt = "Please input your new project name"
-default = "new_project"
-includes_paths = ["package.json"]
+# [[templates.my-app.template_vars]]
+# placeholder = "{{project_name}}"
+# prompt = "Please input your new project name"
+# default = "new_project"
+# includes_paths = ["package.json"]

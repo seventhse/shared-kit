@@ -1,7 +1,7 @@
 use anyhow::{Context, Ok};
 use clap::Args;
 use shared_kit_common::matcher::{Matcher, MatcherBuilder};
-use shared_kit_common::{log_info, log_warn};
+use shared_kit_common::{log_warn, output};
 use std::env;
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -39,28 +39,44 @@ pub struct NewCommand {
 }
 
 pub fn new_command_action(config: &mut Config, args: &NewCommand) -> anyhow::Result<()> {
+    // 🚀 Step 1: 加载配置文件
     if let Some(cfg) = &args.config {
+        output!(title: "📄 Loading Configuration");
         config.reload(Some(cfg.clone()))?;
     }
 
+    // 📁 Step 2: 解析目标路径
     let mut target = env::current_dir()?.join(&args.name);
     target = ensure_target_directory(target)?;
 
-    log_info!("📁 Project will be created in: '{}'", target.display());
+    output!(space);
+    output!(title: "📁 Project Target Directory");
+    output!(line: "Project will be created in: {}", target.display());
 
+    // ⚡ Step 3: 使用指定模板或仓库直接生成（短路径）
     if try_apply_direct_template(&target, args.template.clone(), config, None)? {
+        output!(space);
+        output!(line: "✅ Project created from template.");
         return Ok(());
     }
 
     if try_apply_direct_repo(&target, args.repo.clone(), None)? {
+        output!(space);
+        output!(line: "✅ Project created from remote repo.");
         return Ok(());
     }
 
+    // 📦 Step 4: 交互式选择模板
+    output!(space);
     let new_template_item = ensure_template_selected(&config, args)?;
 
+    // 🔤 Step 5: 收集变量
     let file_matches = ensure_replace_var_input(&new_template_item)
-        .with_context(|| format!("Failed to input replace var"))?;
+        .with_context(|| format!("❌ Failed to input replace variables"))?;
 
+    // 🛠️ Step 6: 应用模板
+    output!(space);
+    output!(title: "🛠️ Applying Template");
     try_apply_direct(&target, new_template_item, file_matches, &config)
 }
 
@@ -74,23 +90,35 @@ fn try_apply_direct(
         .with_exclude_strs_opt(template_item.includes, None)
         .with_exclude_strs_opt(template_item.excludes, None);
 
-    for file_matcher in file_matches {
+    for file_matcher in &file_matches {
         matcher_builder = matcher_builder
             .with_include_strs(file_matcher.includes.clone(), Some(file_matcher.clone()));
     }
 
     let matcher = Arc::new(matcher_builder.build());
 
-    let mut result =
-        try_apply_direct_template(target, template_item.template, config, Some(matcher.clone()))?;
-
-    if !result {
-        result = try_apply_direct_repo(target, template_item.repo, Some(matcher.clone()))?;
+    // 🧱 应用本地模板
+    if try_apply_direct_template(
+        target,
+        template_item.template.clone(),
+        config,
+        Some(matcher.clone()),
+    )? {
+        output!(line: "✅ Project created from local template.");
+    }
+    // 🌍 或从远程仓库拉取
+    else if try_apply_direct_repo(target, template_item.repo.clone(), Some(matcher.clone()))? {
+        output!(line: "✅ Project created from remote repository.");
+    } else {
+        output!(line: "❌ Failed to apply template or repo.");
+        return Ok(()); // 或考虑 Err
     }
 
-    if result && template_item.completed_script.is_some() {
-        let _computed_script = template_item.completed_script.unwrap();
-        todo!("exec computed script")
+    // 🧩 后处理脚本执行（预留）
+    if let Some(completed_script) = template_item.completed_script {
+        output!(title: "🎯 Running post-generation script");
+        // TODO: 实现脚本执行逻辑
+        todo!("exec completed script: {:?}", completed_script);
     }
 
     Ok(())
@@ -102,31 +130,35 @@ fn try_apply_direct_template(
     config: &Config,
     matcher: Option<Arc<Matcher<FileMatcherItem>>>,
 ) -> anyhow::Result<bool> {
-    if template.is_none() {
+    let Some(template) = template else {
+        return Ok(false);
+    };
+
+    let current_config_path = match &config.current_config_path {
+        Some(path) => path,
+        None => {
+            log_warn!("❌ Current config path is not set.");
+            return Ok(false);
+        }
+    };
+
+    let path = compose_path(&current_config_path.parent().unwrap(), &PathBuf::from(&template));
+
+    let Some(template_path) = path else {
+        log_warn!("❌ Template path is invalid.");
+        return Ok(false);
+    };
+
+    if !template_path.exists() {
+        log_warn!("❌ Template path does not exist: '{}'", template_path.display());
         return Ok(false);
     }
-    let template_path = PathBuf::from(template.unwrap());
-    let current_config_path = config.current_config_path.clone().unwrap();
-    let path = compose_path(&current_config_path.parent().unwrap(), &template_path);
 
-    if path.is_none() {
-        log_warn!("Template path is error, please check.");
+    output!(title: "📦 Applying local template");
+    output!(line: "→ From: {}", template_path.display());
+    output!(line: "→ To:   {}", target.display());
 
-        return Ok(false);
-    }
-
-    let path = path.unwrap();
-
-    if !path.exists() {
-        log_warn!(
-            "Template path does not exist: '{}'. Please check the path and try again.",
-            path.display()
-        );
-
-        return Ok(false);
-    }
-
-    copy_directory_with_progress(&path, &target, matcher)?;
+    copy_directory_with_progress(&template_path, target, matcher)?;
 
     Ok(true)
 }
@@ -136,11 +168,12 @@ fn try_apply_direct_repo(
     repo: Option<String>,
     matcher: Option<Arc<Matcher<FileMatcherItem>>>,
 ) -> anyhow::Result<bool> {
-    if repo.is_none() {
+    let Some(repo_url) = repo else {
         return Ok(false);
-    }
+    };
 
-    let repo_url = repo.unwrap();
+    output!(title: "🌍 Cloning template from remote repository");
+    output!(line: "→ {}", repo_url);
 
     let repo = resolve_repo_to_dir(&repo_url)?;
 
