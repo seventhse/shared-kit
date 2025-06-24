@@ -26,43 +26,101 @@ Scaffold a new project, monorepo, or package using built-in or user-defined temp
 shared-kit new <name>
 ```
 
-By default, this creates a new **package** using the built-in template.
+This creates a new project with the specified name using the interactive template selection process.
 
-#### Custom Template Usage
+#### Command Options
 
 ```bash
-shared-kit new <name> --template <template-path>
+shared-kit new <name> [OPTIONS]
 ```
 
-Use a custom template from a local directory or remote source.
+| Option                      | Description                                           |
+| --------------------------- | ----------------------------------------------------- |
+| `-k, --kind <KIND>`         | Filter templates by kind (project, monorepo, package) |
+| `-p, --template <TEMPLATE>` | Use a specific local template path                    |
+| `-r, --repo <REPO>`         | Use a remote repository as template source            |
+| `-c, --config <CONFIG>`     | Use a custom configuration file                       |
 
-#### Supported Template Types
+#### Template Sources
 
-The `new` command supports scaffolding for the following project types:
+The `new` command can create projects from three different sources:
 
-- **monorepo** – Create a new Rust or Node monorepo with common shared configurations.  
-- **project** – Initialize a standalone Node/Rust/other project with standard setup.  
-- **package** – Generate a reusable shared library or module inside an existing monorepo.
+1. **Built-in Templates** - Default templates included in your configuration
+2. **Local Templates** - Custom templates from your local filesystem
+3. **Remote Repositories** - Templates from GitHub, GitLab, or other git hosts
 
-Use the `--type` option to specify the type (default is `package`):
+#### Using Local Templates
 
 ```bash
-shared-kit new my-utils --type package
-shared-kit new frontend-core --type project
-shared-kit new my-monorepo --type monorepo
+shared-kit new my-app --template ./templates/react-app
 ```
 
-#### Example
+This bypasses the template selection process and directly uses the specified local template.
+
+#### Using Remote Repositories
 
 ```bash
-# Using default package template
-shared-kit new my-lib
+shared-kit new my-app --repo username/repo-name
+# or with a specific branch/tag
+shared-kit new my-app --repo username/repo-name#branch-name
+shared-kit new my-app --repo username/repo-name@v1.0.0
+# or with full URL
+shared-kit new my-app --repo https://github.com/username/repo-name
+```
 
-# Using a custom project template
+Supports GitHub, GitLab, and Gitea repositories with branch, tag, and commit specifications.
+
+#### Template Types
+
+The `new` command supports three project types:
+
+- **project** – Initialize a standalone project with standard setup
+- **monorepo** – Create a new monorepo with common shared configurations  
+- **package** – Generate a reusable library or module
+
+Filter available templates by type with the `--kind` option:
+
+```bash
+shared-kit new my-utils --kind package
+shared-kit new frontend-core --kind project
+shared-kit new my-monorepo --kind monorepo
+```
+
+#### Template Variables
+
+Templates can include variable placeholders (e.g., `{{project_name}}`) that will be interactively replaced during project generation. You'll be prompted to provide values for each variable, with default values shown when available.
+
+#### Target Directory Handling
+
+If a target directory already exists, you'll be prompted with options to:
+- Rename the project
+- Overwrite the existing directory
+- Cancel the operation
+
+#### Post-Generation Scripts
+
+Templates can define `completed_script` actions that run automatically after generation, such as:
+- Installing dependencies
+- Initializing git repositories
+- Setting up configuration
+
+#### Examples
+
+```bash
+# Interactive template selection (default)
+shared-kit new my-app
+
+# Using a specific template kind
+shared-kit new my-lib --kind package
+
+# Using a local template
 shared-kit new my-app --template ./templates/react-app
 
-# Creating a new monorepo
-shared-kit new my-kit --type monorepo
+# Using a remote repository template
+shared-kit new my-app --repo octocat/Hello-World#master
+
+# Using a custom configuration file
+shared-kit new my-app --config ./my-templates.json
 ```
 
 ---
@@ -194,7 +252,7 @@ cargo run -- <command> [options]
 For example:
 
 ```bash
-cargo run -- new my-project --type project
+cargo run -- new my-project --kind project
 ```
 
 ---
