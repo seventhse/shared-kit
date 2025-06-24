@@ -11,32 +11,27 @@
           "properties": {
             "kind": {
               "type": "string",
-              "enum": [
-                "project",
-                "package",
-                "monorepo"
-              ]
+              "enum": ["project", "monorepo", "package"],
+              "description": "The category/kind of the template."
             },
             "template": {
               "type": "string",
-              "description": "Local template path (relative or absolute)"
+              "description": "Local template path (relative or absolute)."
             },
             "repo": {
               "type": "string",
               "format": "uri",
-              "description": "Remote repository URL (GitHub or GitLab)"
+              "description": "Remote repository URL (GitHub or GitLab)."
             },
             "includes": {
               "type": "array",
-              "items": {
-                "type": "string"
-              }
+              "items": { "type": "string" },
+              "description": "Glob patterns for files to include."
             },
             "excludes": {
               "type": "array",
-              "items": {
-                "type": "string"
-              }
+              "items": { "type": "string" },
+              "description": "Glob patterns for files to exclude."
             },
             "template_vars": {
               "type": "array",
@@ -44,48 +39,37 @@
                 "type": "object",
                 "properties": {
                   "placeholder": {
-                    "type": "string"
+                    "type": "string",
+                    "description": "The placeholder string used in template files, e.g. {{project_name}}."
                   },
                   "prompt": {
-                    "type": "string"
+                    "type": "string",
+                    "description": "Prompt message shown to the user."
                   },
                   "default": {
-                    "type": "string"
-                  },
-                  "completed_script": {
-                    "type": "array",
-                    "items": {
-                      "type": "string"
-                    },
-                    "description": "Commands executed after template generation"
+                    "type": "string",
+                    "description": "Default value if the user provides no input."
                   },
                   "includes_paths": {
                     "type": "array",
-                    "items": {
-                      "type": "string"
-                    }
-                  },
-                  "excludes_paths": {
-                    "type": "array",
-                    "items": {
-                      "type": "string"
-                    }
+                    "items": { "type": "string" },
+                    "description": "Glob patterns specifying files where this variable should be replaced."
                   }
                 },
-                "required": [
-                  "placeholder"
-                ]
-              }
+                "required": ["placeholder"]
+              },
+              "description": "List of template variables for replacement."
+            },
+            "completed_script": {
+              "type": "array",
+              "items": { "type": "string" },
+              "description": "Commands executed after template generation."
             }
           },
-          "required": [
-            "kind"
-          ]
+          "required": ["kind"]
         }
       }
     }
   },
-  "required": [
-    "templates"
-  ]
+  "required": ["templates"]
 }
