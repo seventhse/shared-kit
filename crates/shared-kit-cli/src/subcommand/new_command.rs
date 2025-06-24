@@ -14,6 +14,7 @@ use crate::config::Config;
 use crate::constant::{TemplateItem, TemplateKind};
 use crate::helper::file_transform_middleware::FileMatcherItem;
 use crate::helper::repo::resolve_repo_to_dir;
+use crate::helper::run_scripts::run_completed_scripts;
 use shared_kit_common::file_utils::path::compose_path;
 
 #[derive(Args, Debug)]
@@ -117,8 +118,8 @@ fn try_apply_direct(
     // 🧩 后处理脚本执行（预留）
     if let Some(completed_script) = template_item.completed_script {
         output!(title: "🎯 Running post-generation script");
-        // TODO: 实现脚本执行逻辑
-        todo!("exec completed script: {:?}", completed_script);
+        output!(space);
+        run_completed_scripts(&completed_script, &target)?;
     }
 
     Ok(())

@@ -62,8 +62,13 @@
             },
             "completed_script": {
               "type": "array",
-              "items": { "type": "string" },
-              "description": "Commands executed after template generation."
+              "items": {
+                "anyOf": [
+                  { "type": "string", "const": "CD_TARGET", "description": "Change working directory to the target path." },
+                  { "type": "string", "description": "Shell command to execute." }
+                ]
+              },
+              "description": "Commands or built-in instructions executed after template generation. Supports shell commands and the built-in CD_TARGET."
             }
           },
           "required": ["kind"]

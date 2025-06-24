@@ -5,7 +5,7 @@
       "kind": "project",
       "template": "./basic-project",
       "excludes": [
-        "src/**"
+        "package.json"
       ],
       "template_vars": [
         {
@@ -16,6 +16,10 @@
             "package.json"
           ]
         }
+      ],
+      "completed_script": [
+        "pnpm init",
+        "pnpm add vite"
       ]
     },
     "demo-app": {

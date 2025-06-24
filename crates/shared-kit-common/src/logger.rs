@@ -116,7 +116,7 @@ macro_rules! log_msg_inner {
 macro_rules! output {
     // 标题行输出（带 emoji）
     (title: $title:expr) => {{
-        println!("\n{}:", $title);
+        println!("\n  {}", $title);
     }};
 
     // 普通提示行输出，带缩进
@@ -145,7 +145,7 @@ macro_rules! output {
     (error: $($arg:tt)*) => {{
         use $crate::console::style;
         let msg = format!($($arg)*);
-        println!("{} {}", style("  ✖").red().bold(), style(msg).red().bold());
+        println!("  {} {}", style("✖").red().bold(), style(msg).red().bold());
     }};
 }
 
