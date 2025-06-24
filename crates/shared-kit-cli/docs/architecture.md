@@ -87,6 +87,31 @@ includes_paths = [
 ```json5
 {
   "templates": {
+    "globset-demo": {
+      "kind": "project",
+      "template": "./any-template",
+      "includes": [
+        "*.rs", // 匹配当前目录下所有 .rs 文件
+        "**/*.rs", // 匹配任意子目录下所有 .rs 文件
+        "src/*", // 匹配 src 目录下所有文件（不递归子目录）
+        "src/**", // 匹配 src 目录下所有文件和子目录（递归）
+        "src/?ain.rs", // 匹配 src 目录下 main.rs、pain.rs 等
+        "src/[mt]ain.rs", // 匹配 src/main.rs 或 src/tain.rs
+        "src/[a-z]ain.rs", // 匹配 src/下 aain.rs~zain.rs
+        "src/\\[special\\].rs", // 匹配 src/[special].rs（转义特殊字符）
+        "src/**/mod.rs", // 匹配 src 目录下任意层级的 mod.rs
+        "tests/**/test_*.rs", // 匹配 tests 目录下任意层级 test_ 开头的 .rs 文件
+        ".*", // 匹配以 . 开头的隐藏文件
+        "foo/bar?.txt", // 匹配 foo/bar1.txt, foo/barA.txt 等
+        "foo/bar[!0-9].txt" // 匹配 foo/barX.txt，但不匹配 foo/bar1.txt~foo/bar9.txt
+      ],
+      "excludes": [
+        "target/**", // 排除 target 目录及其所有内容
+        "**/*.log", // 排除所有 .log 文件
+        ".*", // 排除所有隐藏文件
+        "src/tests/**" // 排除 src/tests 目录及其所有内容
+      ]
+    },
     "package-example": {
       "kind": "package",
       "template": "./basic-package",

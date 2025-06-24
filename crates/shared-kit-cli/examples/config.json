@@ -4,9 +4,8 @@
     "my-app": {
       "kind": "project",
       "template": "./basic-project",
-      "includes": [
-        "./src/**/*",
-        "./package.json"
+      "excludes": [
+        "src/**"
       ],
       "template_vars": [
         {
