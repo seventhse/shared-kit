@@ -1,6 +1,6 @@
 use anyhow::{Context, Ok};
 use atty::Stream;
-use inquire::{Select, Text};
+use inquire::Text;
 use shared_kit_common::output;
 use std::fmt::Display;
 use std::io::{self, BufRead};
@@ -89,8 +89,7 @@ pub fn ensure_template_selected(
     output!(title: "📦 Select a template");
     output!(space);
     let selected = if atty::is(Stream::Stdin) {
-        Select::new("Choose one of the following templates:", options.clone())
-            .prompt()
+        select_with_ui("Choose one of the following templates:", options.clone())
             .with_context(|| "Failed to select a template")?
     } else {
         let stdin = io::stdin();

@@ -26,8 +26,6 @@
       "kind": "project",
       "template": "./basic-project",
       "includes": [
-        "./src/**",
-        "./package.json"
       ],
       "excludes": [
         "package.json"

@@ -84,8 +84,8 @@ pub fn copy_directory_with_progress(
     let file_progress_middleware = FileProgressMiddleware::new(origin.clone(), pb.clone());
 
     let handle = MiddlewarePipeline::new()
-        .add(file_progress_middleware)
         .add_option(matcher.map(|matcher| FileTransformMiddleware::new(origin.clone(), matcher)))
+        .add(file_progress_middleware)
         .finalize(|_ctx| FileTransformKind::NoChange);
 
     copy_directory_with_transform(origin, target, Some(&handle))

@@ -40,13 +40,13 @@ pub struct NewCommand {
 }
 
 pub fn new_command_action(config: &mut Config, args: &NewCommand) -> anyhow::Result<()> {
-    // 🚀 Step 1: 加载配置文件
+    // 🚀 Step 1: load config file
     if let Some(cfg) = &args.config {
         output!(title: "📄 Loading Configuration");
         config.reload(Some(cfg.clone()))?;
     }
 
-    // 📁 Step 2: 解析目标路径
+    // 📁 Step 2: parse target path
     let mut target = env::current_dir()?.join(&args.name);
     target = ensure_target_directory(target)?;
 
@@ -54,7 +54,7 @@ pub fn new_command_action(config: &mut Config, args: &NewCommand) -> anyhow::Res
     output!(title: "📁 Project Target Directory");
     output!(line: "Project will be created in: {}", target.display());
 
-    // ⚡ Step 3: 使用指定模板或仓库直接生成（短路径）
+    // ⚡ Step 3: use assign repo url generate
     if try_apply_direct_template(&target, args.template.clone(), config, None)? {
         output!(space);
         output!(line: "✅ Project created from template.");
@@ -67,15 +67,15 @@ pub fn new_command_action(config: &mut Config, args: &NewCommand) -> anyhow::Res
         return Ok(());
     }
 
-    // 📦 Step 4: 交互式选择模板
+    // 📦 Step 4: Interactive selection template
     output!(space);
     let new_template_item = ensure_template_selected(&config, args)?;
 
-    // 🔤 Step 5: 收集变量
+    // 🔤 Step 5: collect template var
     let file_matches = ensure_replace_var_input(&new_template_item)
         .with_context(|| format!("❌ Failed to input replace variables"))?;
 
-    // 🛠️ Step 6: 应用模板
+    // 🛠️ Step 6: applying template
     output!(space);
     output!(title: "🛠️ Applying Template");
     try_apply_direct(&target, new_template_item, file_matches, &config)
@@ -98,7 +98,7 @@ fn try_apply_direct(
 
     let matcher = Arc::new(matcher_builder.build());
 
-    // 🧱 应用本地模板
+    // 🧱 apply local template
     if try_apply_direct_template(
         target,
         template_item.template.clone(),
@@ -107,7 +107,7 @@ fn try_apply_direct(
     )? {
         output!(line: "✅ Project created from local template.");
     }
-    // 🌍 或从远程仓库拉取
+    // 🌍 or pull remote repo
     else if try_apply_direct_repo(target, template_item.repo.clone(), Some(matcher.clone()))? {
         output!(line: "✅ Project created from remote repository.");
     } else {
@@ -115,7 +115,7 @@ fn try_apply_direct(
         return Ok(()); // 或考虑 Err
     }
 
-    // 🧩 后处理脚本执行（预留）
+    // 🧩 completed script
     if let Some(completed_script) = template_item.completed_script {
         output!(title: "🎯 Running post-generation script");
         output!(space);
